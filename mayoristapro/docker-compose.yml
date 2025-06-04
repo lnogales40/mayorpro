@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: mayoristapro_db
+    environment:
+      POSTGRES_DB: mayoristapro_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432" # Opcional: para acceder a la BD desde tu host
+    volumes:
+      - db_data:/var/lib/postgresql/data # Persistencia de datos
+
+  backend:
+    build: ./backend # Dockerfile en la carpeta backend/
+    container_name: mayoristapro_backend
+    ports:
+      - "3000:3000" # Puerto para la API REST
+      - "3001:3001" # Nuevo puerto para WebSockets
+    environment:
+      DATABASE_URL: postgres://user:password@db:5432/mayoristapro_db
+      JWT_SECRET: your_super_secret_jwt_key_for_auth # Clave secreta para JWT
+      ADMIN_EMAIL: admin@mayoristapro.com # Credenciales iniciales para el admin
+      ADMIN_PASSWORD: adminpassword
+      DEFAULT_SHIPPING_COST: "1500.00" # Costo de envío por defecto
+      FREE_SHIPPING_THRESHOLD: "80000.00" # Umbral para envío gratis
+      FREE_SHIPPING_RADIUS_KM: "10" # Radio en KM para envío gratis
+      PUBLICATION_COST_PER_LOT: "5000.00" # Costo por lote de publicación
+      PRODUCTS_PER_LOT: "10" # Cantidad de productos por lote de publicación
+      DELIVERY_PAYMENT_PER_ORDER: "1000.00" # Pago al repartidor por pedido entregado
+      # GOOGLE_MAPS_API_KEY: your_google_maps_api_key # Si se usa Google Maps API para geolocalización/distancia
+    depends_on:
+      - db
+
+  frontend_client:
+    build: ./frontend_client # Dockerfile en la carpeta frontend_client/
+    container_name: mayoristapro_frontend_client
+    ports:
+      - "80:80" # Cliente web accesible en el puerto 80 del host
+    environment:
+      REACT_APP_BACKEND_API_URL: http://localhost:3000
+      REACT_APP_WEBSOCKET_URL: ws://localhost:3001
+      # REACT_APP_GOOGLE_MAPS_API_KEY: your_google_maps_api_key
+    depends_on:
+      - backend
+
+  frontend_merchant:
+    build: ./frontend_merchant # Dockerfile en la carpeta frontend_merchant/
+    container_name: mayoristapro_frontend_merchant
+    ports:
+      - "8080:80" # El panel de comerciante en el puerto 8080 del host
+    environment:
+      REACT_APP_BACKEND_API_URL: http://localhost:3000
+    depends_on:
+      - backend
+
+  frontend_admin:
+    build: ./frontend_admin # Dockerfile en la carpeta frontend_admin/
+    container_name: mayoristapro_frontend_admin
+    ports:
+      - "8081:80" # Panel de administración en el puerto 8081 del host
+    environment:
+      REACT_APP_BACKEND_API_URL: http://localhost:3000
+    depends_on:
+      - backend
+
+  frontend_delivery: # Nuevo servicio para el repartidor
+    build: ./frontend_delivery # Dockerfile en la carpeta frontend_delivery/
+    container_name: mayoristapro_frontend_delivery
+    ports:
+      - "8082:80" # Aplicación del repartidor en el puerto 8082 del host
+    environment:
+      REACT_APP_BACKEND_API_URL: http://localhost:3000
+      REACT_APP_WEBSOCKET_URL: ws://localhost:3001
+      # REACT_APP_GOOGLE_MAPS_API_KEY: your_google_maps_api_key
+    depends_on:
+      - backend
+
+volumes:
+  db_data: # Volumen para persistir los datos de la base de datos
